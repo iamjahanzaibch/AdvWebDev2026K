@@ -3,6 +3,8 @@
 // ===============================
 const actions = document.getElementById("resourceActions");
 const resourceNameContainer = document.getElementById("resourceNameContainer");
+const resourceDescriptionInput = document.getElementById("resourceDescription");
+const resourcePriceInput = document.getElementById("resourcePrice");
 
 // Example roles
 const role = "admin"; // "reserver" | "admin"
@@ -29,6 +31,7 @@ function addButton({ label, type = "button", value, classes = "" }) {
   btn.textContent = label;
   btn.name = "action";
   if (value) btn.value = value;
+  if (value === "create") btn.id = "resourceCreateButton";
 
   btn.className = `${BUTTON_BASE_CLASSES} ${classes}`.trim();
 
@@ -129,6 +132,25 @@ function isResourceNameValid(value) {
   return lengthValid && charactersValid;
 }
 
+function isResourceDescriptionValid(value) {
+  const trimmed = value.trim();
+  const allowedPattern = /^[a-zA-Z0-9äöåÄÖÅ ]+$/;
+  const lengthValid = trimmed.length >= 10 && trimmed.length <= 50;
+  const charactersValid = allowedPattern.test(trimmed);
+
+  return lengthValid && charactersValid;
+}
+
+function isResourcePriceValid(value) {
+  if (value === null || value === undefined || value === "") return false;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue >= 0;
+}
+
+function isPriceUnitSelected() {
+  return !!document.querySelector('input[name="resourcePriceUnit"]:checked');
+}
+
 function setInputVisualState(input, state) {
   // Reset to neutral base state (remove only our own validation-related classes)
   input.classList.remove(
@@ -139,7 +161,9 @@ function setInputVisualState(input, state) {
     "bg-red-100",
     "focus:ring-red-500/30",
     "focus:border-brand-blue",
-    "focus:ring-brand-blue/30"
+    "focus:ring-brand-blue/30",
+    "focus:border-green-500",
+    "focus:border-red-500"
   );
 
   // Ensure base focus style is present when neutral
@@ -147,34 +171,70 @@ function setInputVisualState(input, state) {
   input.classList.add("focus:ring-2");
 
   if (state === "valid") {
-    input.classList.add("border-green-500", "bg-green-100", "focus:ring-green-500/30");
+    input.classList.add(
+      "border-green-500",
+      "bg-green-100",
+      "focus:ring-green-500/30",
+      "focus:border-green-500"
+    );
   } else if (state === "invalid") {
-    input.classList.add("border-red-500", "bg-red-100", "focus:ring-red-500/30");
+    input.classList.add(
+      "border-red-500",
+      "bg-red-100",
+      "focus:ring-red-500/30",
+      "focus:border-red-500"
+    );
   } else {
-    // neutral: keep base border/bg; nothing else needed
+    input.classList.add("focus:border-brand-blue", "focus:ring-brand-blue/30");
   }
 }
 
-function attachResourceNameValidation(input) {
-  const update = () => {
-    const raw = input.value;
-    if (raw.trim() === "") {
-      setInputVisualState(input, "neutral");
-      setButtonEnabled(createButton, false);
-      return;
-    }
+function getFormValidationState() {
+  const nameValue = resourceNameInput ? resourceNameInput.value : "";
+  const descriptionValue = resourceDescriptionInput ? resourceDescriptionInput.value : "";
+  const priceValue = resourcePriceInput ? resourcePriceInput.value : "";
 
-    const valid = isResourceNameValid(raw);
+  const nameValid = isResourceNameValid(nameValue);
+  const descriptionValid = isResourceDescriptionValid(descriptionValue);
+  const priceValid = isResourcePriceValid(priceValue);
+  const priceUnitValid = isPriceUnitSelected();
 
-    setInputVisualState(input, valid ? "valid" : "invalid");
-    setButtonEnabled(createButton, valid);
+  return {
+    nameValid,
+    descriptionValid,
+    priceValid,
+    priceUnitValid,
+    allValid: nameValid && descriptionValid && priceValid && priceUnitValid,
   };
+}
 
-  // Real-time validation
-  input.addEventListener("input", update);
+function updateFormValidation() {
+  if (resourceNameInput) {
+    const nameRaw = resourceNameInput.value;
+    if (nameRaw.trim() === "") {
+      setInputVisualState(resourceNameInput, "neutral");
+    } else {
+      setInputVisualState(
+        resourceNameInput,
+        isResourceNameValid(nameRaw) ? "valid" : "invalid"
+      );
+    }
+  }
 
-  // Initialize state on page load (Create disabled until valid)
-  update();
+  if (resourceDescriptionInput) {
+    const descriptionRaw = resourceDescriptionInput.value;
+    if (descriptionRaw.trim() === "") {
+      setInputVisualState(resourceDescriptionInput, "neutral");
+    } else {
+      setInputVisualState(
+        resourceDescriptionInput,
+        isResourceDescriptionValid(descriptionRaw) ? "valid" : "invalid"
+      );
+    }
+  }
+
+  const { allValid } = getFormValidationState();
+  setButtonEnabled(createButton, allValid);
 }
 
 // ===============================
@@ -184,4 +244,21 @@ renderActionButtons(role);
 
 // Create + validate input
 const resourceNameInput = createResourceNameInput(resourceNameContainer);
-attachResourceNameValidation(resourceNameInput);
+
+if (resourceNameInput) {
+  resourceNameInput.addEventListener("input", updateFormValidation);
+}
+
+if (resourceDescriptionInput) {
+  resourceDescriptionInput.addEventListener("input", updateFormValidation);
+}
+
+if (resourcePriceInput) {
+  resourcePriceInput.addEventListener("input", updateFormValidation);
+}
+
+document.querySelectorAll('input[name="resourcePriceUnit"]').forEach((input) => {
+  input.addEventListener("change", updateFormValidation);
+});
+
+updateFormValidation();

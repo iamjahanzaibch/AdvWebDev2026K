@@ -14,6 +14,69 @@ function logSection(title, data) {
   console.groupEnd();
 }
 
+function normalizeText(value) {
+  return value.trim();
+}
+
+function getCheckedPriceUnit() {
+  const checked = document.querySelector('input[name="resourcePriceUnit"]:checked');
+  return checked ? checked.value : "";
+}
+
+function getCreateButton() {
+  return document.querySelector("#resourceCreateButton") || document.querySelector('button[value="create"]');
+}
+
+function setCreateButtonEnabled(enabled) {
+  const button = getCreateButton();
+  if (!button) return;
+
+  if (typeof setButtonEnabled === "function") {
+    setButtonEnabled(button, enabled);
+    return;
+  }
+
+  button.disabled = !enabled;
+  button.classList.toggle("cursor-not-allowed", !enabled);
+  button.classList.toggle("opacity-50", !enabled);
+}
+
+function isTextValid(value, minLength, maxLength) {
+  const trimmed = value.trim();
+  const allowedPattern = /^[a-zA-Z0-9äöåÄÖÅ ]+$/;
+  if (!allowedPattern.test(trimmed)) return false;
+  return trimmed.length >= minLength && trimmed.length <= maxLength;
+}
+
+function isPriceValid(value) {
+  if (value === null || value === undefined || value === "") return false;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue >= 0;
+}
+
+function isFormValid() {
+  const nameValue = $("resourceName")?.value ?? "";
+  const descriptionValue = $("resourceDescription")?.value ?? "";
+  const priceValue = $("resourcePrice")?.value ?? "";
+  const priceUnitValue = getCheckedPriceUnit();
+
+  const nameValid = typeof isResourceNameValid === "function"
+    ? isResourceNameValid(nameValue)
+    : isTextValid(nameValue, 5, 30);
+
+  const descriptionValid = typeof isResourceDescriptionValid === "function"
+    ? isResourceDescriptionValid(descriptionValue)
+    : isTextValid(descriptionValue, 10, 50);
+
+  const priceValid = typeof isResourcePriceValid === "function"
+    ? isResourcePriceValid(priceValue)
+    : isPriceValid(priceValue);
+
+  const priceUnitValid = priceUnitValue !== "";
+
+  return nameValid && descriptionValid && priceValid && priceUnitValid;
+}
+
 // -------------- Form wiring --------------
 document.addEventListener("DOMContentLoaded", () => {
   const form = $("resourceForm");
@@ -29,13 +92,30 @@ async function onSubmit(event) {
   event.preventDefault();
   const submitter = event.submitter;
   const actionValue = submitter && submitter.value ? submitter.value : "create";
+  const valid = isFormValid();
+
+  if (!valid) {
+    setCreateButtonEnabled(false);
+    console.warn("Form is invalid. Submission cancelled.");
+    return;
+  }
+
+  setCreateButtonEnabled(false);
+
+  const resourceName = normalizeText($("resourceName")?.value ?? "");
+  const resourceDescription = normalizeText($("resourceDescription")?.value ?? "");
+  const resourcePriceRaw = $("resourcePrice")?.value ?? "";
+  const resourcePrice = resourcePriceRaw === "" ? "" : Number(resourcePriceRaw);
+  const resourcePriceUnit = getCheckedPriceUnit();
+  const resourceAvailable = $("resourceAvailable")?.checked ?? false;
+
   const payload = {
     action: actionValue,
-    resourceName: $("resourceName")?.value ?? "",
-    resourceDescription: $("resourceDescription")?.value ?? "",
-    resourceAvailable: $("resourceAvailable")?.value ?? "",
-    resourcePrice: $("resourcePrice")?.value ?? "",
-    resourcePriceUnit: $("resourcePriceUnit")?.value ?? ""
+    resourceName,
+    resourceDescription,
+    resourceAvailable,
+    resourcePrice,
+    resourcePriceUnit
   };
 
   logSection("Sending payload to httpbin.org/post", payload);
@@ -65,5 +145,7 @@ async function onSubmit(event) {
 
   } catch (err) {
     console.error("POST error:", err);
+  } finally {
+    setCreateButtonEnabled(isFormValid());
   }
 }
