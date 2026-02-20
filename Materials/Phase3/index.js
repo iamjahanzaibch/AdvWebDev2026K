@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const app = express();
-const PORT = process.env.PORT;
+const PORT = Number(process.env.PORT) || 5000;
 const path = require("path");
 
 // Timestamp
@@ -43,12 +43,44 @@ app.post("/api/resources", (req, res) => {
   // Normalize inputs
   const resourceAction = String(action).trim();
   const name = String(resourceName).trim();
-  const description = "";
-  const available = Boolean(resourceAvailable);
+  const description = String(resourceDescription).trim();
+  const available =
+    resourceAvailable === true ||
+    resourceAvailable === "true" ||
+    resourceAvailable === 1 ||
+    resourceAvailable === "1";
   const price = Number.isFinite(Number(resourcePrice))
     ? Number(resourcePrice)
     : 0;
   const unit = String(resourcePriceUnit || "").trim();
+
+  if (!["create", "update", "delete"].includes(resourceAction)) {
+    return res.status(400).json({
+      ok: false,
+      error: "Invalid action. Use create, update, or delete.",
+    });
+  }
+
+  if (!name) {
+    return res.status(400).json({
+      ok: false,
+      error: "resourceName is required.",
+    });
+  }
+
+  if ((resourceAction === "create" || resourceAction === "update") && !description) {
+    return res.status(400).json({
+      ok: false,
+      error: "resourceDescription is required for create/update.",
+    });
+  }
+
+  if ((resourceAction === "create" || resourceAction === "update") && !unit) {
+    return res.status(400).json({
+      ok: false,
+      error: "resourcePriceUnit is required for create/update.",
+    });
+  }
 
   // The client's request to the console
   console.log("The client's POST request ", `[${timestamp()}]`);
@@ -56,10 +88,21 @@ app.post("/api/resources", (req, res) => {
   console.log("Action ➡️ ", resourceAction);
   console.log("Name ➡️ ", name);
   console.log("Description ➡️ ", description);
+  console.log("Availability ➡️ ", available);
   console.log("Price ➡️ ", price);
   console.log("Price unit ➡️ ", unit);
   console.log("--------------------------");
-  return res.json({ ok: true, echo: req.body });
+  return res.json({
+    ok: true,
+    echo: {
+      action: resourceAction,
+      resourceName: name,
+      resourceDescription: description,
+      resourceAvailable: available,
+      resourcePrice: price,
+      resourcePriceUnit: unit,
+    },
+  });
 });
 
 // --- Fallback 404 for unknown API routes ---

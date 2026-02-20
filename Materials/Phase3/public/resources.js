@@ -9,6 +9,8 @@ const role = "admin"; // "reserver" | "admin"
 
 // Will hold a reference to the Create button so we can enable/disable it
 let createButton = null;
+let updateButton = null;
+let deleteButton = null;
 
 // Resource name and description validation status
 let resourceNameValid = false
@@ -66,6 +68,7 @@ function renderActionButtons(currentRole) {
     createButton = addButton({
       label: "Create",
       type: "submit",
+      value: "create",
       classes: BUTTON_ENABLED_CLASSES,
     });
   }
@@ -80,21 +83,27 @@ function renderActionButtons(currentRole) {
 
     updateButton = addButton({
       label: "Update",
+      type: "submit",
       value: "update",
       classes: BUTTON_ENABLED_CLASSES,
     });
 
     deleteButton = addButton({
       label: "Delete",
+      type: "submit",
       value: "delete",
       classes: BUTTON_ENABLED_CLASSES,
     });
   }
 
   // Default: Buttons are disabled until validation says it's OK
-  setButtonEnabled(createButton, false);
-  setButtonEnabled(updateButton, false);
-  setButtonEnabled(deleteButton, false);
+  setActionButtonsEnabled(false);
+}
+
+function setActionButtonsEnabled(enabled) {
+  setButtonEnabled(createButton, enabled);
+  setButtonEnabled(updateButton, enabled);
+  setButtonEnabled(deleteButton, enabled);
 }
 
 // ===============================
@@ -197,7 +206,7 @@ function attachResourceNameValidation(input) {
     const raw = input.value;
     if (raw.trim() === "") {
       setInputVisualState(input, "neutral");
-      setButtonEnabled(createButton, false);
+      setActionButtonsEnabled(false);
       return;
     }
 
@@ -205,8 +214,7 @@ function attachResourceNameValidation(input) {
     resourceNameValid = isResourceNameValid(raw);
 
     setInputVisualState(input, resourceNameValid ? "valid" : "invalid");
-    //setButtonEnabled(createButton, valid);
-    setButtonEnabled(createButton, resourceNameValid && resourceDescriptionValid);
+    setActionButtonsEnabled(resourceNameValid && resourceDescriptionValid);
   };
 
   // Real-time validation
@@ -221,7 +229,7 @@ function attachResourceDescriptionValidation(input) {
     const raw = input.value;
     if (raw.trim() === "") {
       setInputVisualState(input, "neutral");
-      setButtonEnabled(createButton, false);
+      setActionButtonsEnabled(false);
       return;
     }
 
@@ -229,7 +237,7 @@ function attachResourceDescriptionValidation(input) {
     resourceDescriptionValid = isResourceDescriptionValid(raw);
 
     setInputVisualState(input, resourceDescriptionValid ? "valid" : "invalid");
-    setButtonEnabled(createButton, resourceNameValid && resourceDescriptionValid);
+    setActionButtonsEnabled(resourceNameValid && resourceDescriptionValid);
   };
 
   // Real-time validation
