@@ -1,0 +1,92 @@
+﻿Phase 4 - Server-Side Validation and Functionality Verification
+Date: 2026-03-09
+
+1) Deployment and Environment Check
+- The system was deployed with Docker Compose from `Materials/Phase4`.
+- Both containers were running:
+  - `booking-system-phase4-web` (Node.js backend)
+  - `booking-system-phase4-db` (PostgreSQL)
+- API base URL used for testing: `http://localhost:5000/api/resources`
+
+2) Database Baseline (Before Testing)
+- Query used:
+  - `SELECT COUNT(*) FROM resources;`
+- Result before tests:
+  - `COUNT_BEFORE = 6`
+
+3) Server-Side Validation Tests (HTTP Requests)
+
+Test A - Invalid action
+- Payload:
+  - `{"action":"delete","resourceName":"Room A","resourceDescription":"Valid Description","resourceAvailable":true,"resourcePrice":5,"resourcePriceUnit":"day"}`
+- Expected: rejected
+- Actual:
+  - Status `400`
+  - `{"ok":false,"errors":[{"field":"action","msg":"action must be 'create'"}]}`
+
+Test B - Empty resource name
+- Payload:
+  - `{"action":"create","resourceName":"   ","resourceDescription":"Another valid text","resourceAvailable":true,"resourcePrice":5,"resourcePriceUnit":"day"}`
+- Expected: rejected
+- Actual:
+  - Status `400`
+  - `{"ok":false,"errors":[{"field":"resourceName","msg":"resourceName cannot be empty"}]}`
+
+Test C - Invalid availability type
+- Payload:
+  - `{"action":"create","resourceName":"Room A","resourceDescription":"Valid Description","resourceAvailable":"maybe","resourcePrice":5,"resourcePriceUnit":"day"}`
+- Expected: rejected
+- Actual:
+  - Status `400`
+  - `{"ok":false,"errors":[{"field":"resourceAvailable","msg":"resourceAvailable must be boolean"}]}`
+
+Test D - Invalid price unit
+- Payload:
+  - `{"action":"create","resourceName":"Room A","resourceDescription":"Valid Description","resourceAvailable":true,"resourcePrice":5,"resourcePriceUnit":"year"}`
+- Expected: rejected
+- Actual:
+  - Status `400`
+  - `{"ok":false,"errors":[{"field":"resourcePriceUnit","msg":"resourcePriceUnit must be 'hour', 'day', 'week', or 'month'"}]}`
+
+Test E - Malformed JSON
+- Payload body:
+  - `{bad json}`
+- Expected: rejected with meaningful error
+- Actual:
+  - Status `400`
+  - `{"ok":false,"error":"Invalid JSON payload"}`
+
+4) Functional Create Test (Valid Request)
+
+Test F - Valid create
+- Payload:
+  - `{"action":"create","resourceName":"Verification Room B","resourceDescription":"Valid room for verification run","resourceAvailable":true,"resourcePrice":16,"resourcePriceUnit":"week"}`
+- Expected: created with correct values
+- Actual:
+  - Status `201`
+  - `{"ok":true,"data":{"id":7,"name":"Verification Room B","description":"Valid room for verification run","available":true,"price":"16.00","price_unit":"week","created_at":"2026-03-08T21:18:32.814Z"}}`
+
+5) Database Check (After Testing)
+- Query used:
+  - `SELECT COUNT(*) FROM resources;`
+- Result after tests:
+  - `COUNT_AFTER = 7`
+  - `DELTA = 1`
+
+Interpretation:
+- Only the valid request inserted a new row.
+- Invalid and malformed requests were rejected and did not create database rows.
+
+6) Sample Latest Rows in Database
+- Query used:
+  - `SELECT id, name, available, price, price_unit, created_at FROM resources ORDER BY id DESC LIMIT 3;`
+- Result snapshot:
+  - `7 | Verification Room B | t | 16.00 | week | 2026-03-08 21:18:32.814564+00`
+  - `6 | Verification Room   | t | 15.50 | week | 2026-03-08 21:18:07.97689+00`
+  - `5 | Auditorium 1        | t | 30.00 | day  | 2026-03-08 21:15:50.875182+00`
+
+Final Conclusion
+- Server-side validation is enforced.
+- Malformed and logically invalid input is rejected with meaningful HTTP responses.
+- Create functionality stores correct values in PostgreSQL.
+- End-to-end behavior is consistent with the Phase 4 assignment requirements.

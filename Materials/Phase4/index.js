@@ -1,5 +1,4 @@
 require("dotenv").config();
-const crypto = require('crypto');
 const express = require("express");
 const app = express();
 const PORT = process.env.IPORT;
@@ -38,37 +37,52 @@ const pool = new Pool({});
 const resourceValidators = [
   body('action')
     .exists({ checkFalsy: true }).withMessage('action is required')
+    .bail()
     .trim()
     .isIn(['create'])
     .withMessage("action must be 'create'"),
 
   body('resourceName')
-    .exists({ checkFalsy: true }).withMessage('resourceName is required')
+    .exists().withMessage('resourceName is required')
+    .bail()
     .isString().withMessage('resourceName must be a string')
+    .bail()
     .trim()
-    .escape(),
+    .notEmpty().withMessage('resourceName cannot be empty')
+    .bail()
+    .matches(/^[A-Za-z0-9 ]+$/).withMessage('resourceName can only contain letters, numbers, and spaces')
+    .isLength({ min: 5, max: 30 }).withMessage('resourceName must be 5-30 characters'),
 
   body('resourceDescription')
-    .exists({ checkFalsy: true }).withMessage('resourceDescription is required')
+    .exists().withMessage('resourceDescription is required')
+    .bail()
     .isString().withMessage('resourceDescription must be a string')
+    .bail()
     .trim()
+    .notEmpty().withMessage('resourceDescription cannot be empty')
+    .bail()
+    .matches(/^[A-Za-z0-9 ]+$/).withMessage('resourceDescription can only contain letters, numbers, and spaces')
     .isLength({ min:10, max: 50 }).withMessage('resourceDescription must be 10-50 characters'),
 
   body('resourceAvailable')
-    .exists({ checkFalsy: true }).withMessage('resourceAvailable is required')
+    .exists().withMessage('resourceAvailable is required')
+    .bail()
     .isBoolean().withMessage('resourceAvailable must be boolean')
     .toBoolean(), // coercion
 
   body('resourcePrice')
-    .exists({ checkFalsy: true }).withMessage('resourcePrice is required')
+    .exists().withMessage('resourcePrice is required')
+    .bail()
     .isFloat({ min: 0 }).withMessage('resourcePrice must be a non-negative number')
     .toFloat(), // coercion
 
   body('resourcePriceUnit')
     .exists({ checkFalsy: true }).withMessage('resourcePriceUnit is required')
+    .bail()
     .isString().withMessage('resourcePriceUnit must be a string')
+    .bail()
     .trim()
-    .isIn(['hour', 'day'])
+    .isIn(['hour', 'day', 'week', 'month'])
     .withMessage("resourcePriceUnit must be 'hour', 'day', 'week', or 'month'"),
 ];
 
@@ -84,7 +98,7 @@ app.post('/api/resources', resourceValidators, async (req, res) => {
   }
 
   // Pull normalized values (coerced by express-validator .toBoolean/.toFloat)
-  let {
+  const {
     action = '',
     resourceName = '',
     resourceDescription = '',
@@ -108,8 +122,6 @@ app.post('/api/resources', resourceValidators, async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Only create is implemented right now' });
   }
 
-  resourceAvailable = false;
-
   try {
     const insertSql = `
       INSERT INTO resources (name, description, available, price, price_unit)
@@ -117,10 +129,10 @@ app.post('/api/resources', resourceValidators, async (req, res) => {
       RETURNING id, name, description, available, price, price_unit, created_at
     `;
     const params = [
-      crypto.createHash('sha256').update(resourceName, 'utf8').digest('hex'),
+      resourceName,
       resourceDescription,
       Boolean(resourceAvailable),
-      Number(resourcePrice)*2,
+      Number(resourcePrice),
       resourcePriceUnit
     ];
 
@@ -136,7 +148,14 @@ app.post('/api/resources', resourceValidators, async (req, res) => {
 
 // --- Fallback 404 for unknown API routes ---
 app.use('/api', (req, res) => {
-  res.status(404).json({ error: 'Not found' });
+  res.status(404).json({ ok: false, error: 'Not found' });
+});
+
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ ok: false, error: 'Invalid JSON payload' });
+  }
+  return next(err);
 });
 
 // --- Start server ---
