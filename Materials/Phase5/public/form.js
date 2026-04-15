@@ -84,7 +84,7 @@ async function readResponseBody(response) {
  */
 function buildValidationMessage(errors) {
   if (!Array.isArray(errors) || errors.length === 0) {
-    return "Validation failed. Please check your input fields.";
+    return "Validation failed: some input values are invalid. Please review the form fields and try again.";
   }
 
   const lines = errors.map((e) => {
@@ -93,7 +93,7 @@ function buildValidationMessage(errors) {
     return `• ${field}: ${msg}`;
   });
 
-  return `Your request was blocked by server-side validation:\n\n${lines.join("\n")}`;
+  return `We could not create the resource because some fields are invalid.\n\nPlease fix these fields and submit again:\n${lines.join("\n")}`;
 }
 
 /**
@@ -157,10 +157,17 @@ async function onSubmit(event) {
 
       // 409 = duplicate resourceName (our new feature)
       if (response.status === 409) {
-        const msg =
+        const details =
           body?.details ||
-          "A resource with the same name already exists. Please choose another name.";
-        showFormMessage("info", `Duplicate blocked (409):\n\n${msg}`);
+          "A resource with this name already exists.";
+        const msg = [
+          "A resource with this name already exists, so it was not added.",
+          "",
+          `Server details: ${details}`,
+          "",
+          "What to do next: change the resource name or check the existing resources list.",
+        ].join("\n");
+        showFormMessage("info", msg);
         return;
       }
 
@@ -179,6 +186,8 @@ async function onSubmit(event) {
       : "";
 
     const msgLines = [];
+    msgLines.push("Resource added successfully.");
+    msgLines.push("");
     msgLines.push(`Name ➡️ ${body?.data?.name ?? ""}`);
     if (createdAt) msgLines.push(`Created at ➡️ ${createdAt}`);
     msgLines.push(`ID in database ➡️ ${body?.data?.id ?? ""}`);

@@ -10,17 +10,33 @@ const router = express.Router();
 
 // POST /api/resources -> create (minimal) + duplicate check
 router.post("/", resourceValidators, async (req, res) => {
+  // Temp ID for the actor
+  const actorUserId = null;
+
   // Validate input
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const fieldErrors = errors.array().map((e) => ({ field: e.path, msg: e.msg }));
+
+    // Log validation failures with concise field details for easier debugging.
+    const validationSummary = fieldErrors
+      .map((e) => `${e.field}: ${e.msg}`)
+      .join(" | ");
+
+    await logEvent({
+      actorUserId,
+      message: `RESOURCE_CREATE_VALIDATION_FAILED: ${validationSummary}`,
+      entityType: "resource",
+      entityId: null,
+    });
+
     return res.status(400).json({
       ok: false,
-      errors: errors.array().map((e) => ({ field: e.path, msg: e.msg })),
+      error: "Validation failed",
+      details: "One or more fields are invalid. Fix the listed fields and try again.",
+      errors: fieldErrors,
     });
   }
-
-  // Temp ID for the actor
-  const actorUserId = null;
 
   // Read values from request body (simple approach for teaching)
   const {
@@ -72,7 +88,7 @@ router.post("/", resourceValidators, async (req, res) => {
     const resourceId = rows[0].id;
     await logEvent({
       actorUserId,
-      message: `XXXX ${resourceId} XXXX`,
+      message: `RESOURCE_CREATED: id=${resourceId}, name="${rows[0].name}", price=${rows[0].price}, unit="${rows[0].price_unit}"`,
       entityType: "resource",
       entityId: resourceId,
     });
@@ -85,7 +101,7 @@ router.post("/", resourceValidators, async (req, res) => {
       console.error(err);
       await logEvent({
         actorUserId,
-        message: `YYYY ${resourceName} YYYY`,
+        message: `RESOURCE_CREATE_BLOCKED_DUPLICATE: name="${resourceName}" (409)`,
         entityType: "resource",
         entityId: null,
       });
